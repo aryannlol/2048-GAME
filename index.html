@@ -505,86 +505,102 @@
             }, { once: true });
         }
 
-        function updateDisplay(animated = true) {
+function updateDisplay(animated = true) {
     const grid = document.getElementById('grid');
     const gridRect = grid.getBoundingClientRect();
     const cellSize = (gridRect.width - 50) / 4;
     
-    // Remove sliding class from all tiles first
-    document.querySelectorAll('.tile').forEach(tile => {
-        tile.classList.remove('sliding');
-    });
-    
-    // Store current tiles and their positions
-    const existingTiles = {};
-    document.querySelectorAll('.tile').forEach(tile => {
-        const value = parseInt(tile.textContent);
-        const position = tile.dataset.position;
-        existingTiles[position] = tile;
-    });
-
-    // Update or create tiles
+    // Create a mapping of positions for animation
+    const currentPositions = {};
     for (let i = 0; i < gridSize; i++) {
         for (let j = 0; j < gridSize; j++) {
-            const value = board[i][j];
-            const position = `${i}-${j}`;
-            const x = j * (cellSize + 10) + 10;
-            const y = i * (cellSize + 10) + 10;
-
-            if (value !== 0) {
-                let tile;
-                const previousPosition = tilePositions[`${value}-${i}-${j}`];
-
-                if (previousPosition && existingTiles[previousPosition]) {
-                    // Move existing tile
-                    tile = existingTiles[previousPosition];
-                    delete existingTiles[previousPosition];
-                } else if (existingTiles[position]) {
-                    // Update existing tile at current position
-                    tile = existingTiles[position];
-                    delete existingTiles[position];
-                } else {
-                    // Create new tile
-                    tile = document.createElement('div');
-                    tile.className = 'tile new';
-                }
-
-                // Update tile
-                tile.className = `tile tile-${value}`;
-                if (animated) {
-                    tile.classList.add('sliding');
-                }
-                tile.textContent = value;
-                tile.dataset.position = position;
-                tile.dataset.value = value;
-
-                if (animated) {
-                    tile.style.transform = `translate(${x}px, ${y}px)`;
-                } else {
-                    tile.style.transform = `translate(${x}px, ${y}px)`;
-                    tile.style.transition = 'none';
-                    setTimeout(() => tile.style.transition = '', 0);
-                }
-
-                if (!grid.contains(tile)) {
-                    grid.appendChild(tile);
-                }
-
-                // Store new position
-                tilePositions[`${value}-${i}-${j}`] = position;
+            if (board[i][j] !== 0) {
+                currentPositions[`${board[i][j]}-${i}-${j}`] = {
+                    value: board[i][j],
+                    row: i,
+                    col: j
+                };
             }
         }
     }
-
-    // Remove old tiles
-    Object.values(existingTiles).forEach(tile => tile.remove());
+    
+    // Remove tiles that no longer exist on the board
+    document.querySelectorAll('.tile').forEach(tile => {
+        const value = parseInt(tile.dataset.value);
+        const row = parseInt(tile.dataset.row);
+        const col = parseInt(tile.dataset.col);
+        
+        // Check if this tile still exists in the current board
+        let exists = false;
+        for (const key in currentPositions) {
+            if (currentPositions[key].value === value) {
+                exists = true;
+                break;
+            }
+        }
+        
+        if (!exists) {
+            tile.remove();
+        }
+    });
+    
+    // Update existing tiles and create new ones
+    for (let i = 0; i < gridSize; i++) {
+        for (let j = 0; j < gridSize; j++) {
+            const value = board[i][j];
+            if (value !== 0) {
+                const x = j * (cellSize + 10) + 10;
+                const y = i * (cellSize + 10) + 10;
+                
+                // Look for an existing tile with this value
+                let tile = document.querySelector(`.tile[data-value="${value}"][data-row="${i}"][data-col="${j}"]`);
+                
+                if (!tile) {
+                    // No existing tile at this position, maybe it slid from somewhere else
+                    tile = document.querySelector(`.tile[data-value="${value}"]:not([data-row="${i}"][data-col="${j}"])`);
+                    
+                    if (!tile) {
+                        // Create a new tile
+                        tile = document.createElement('div');
+                        tile.className = `tile tile-${value}`;
+                        tile.textContent = value;
+                        tile.dataset.value = value;
+                        
+                        // Position at current location without animation for new tiles
+                        tile.style.transform = `translate(${x}px, ${y}px)`;
+                        
+                        // Add appear animation for new tiles
+                        tile.style.animation = 'appear 0.2s ease-in-out';
+                        
+                        grid.appendChild(tile);
+                    } else {
+                        // This is an existing tile that needs to slide
+                        // Add sliding class for animation
+                        tile.classList.add('sliding');
+                    }
+                }
+                
+                // Update data attributes
+                tile.dataset.row = i;
+                tile.dataset.col = j;
+                tile.dataset.value = value;
+                
+                // Update position with CSS transform
+                setTimeout(() => {
+                    tile.style.transform = `translate(${x}px, ${y}px)`;
+                }, 0);
+            }
+        }
+    }
 }
 
 function move(direction) {
     let moved = false;
     const previousBoard = board.map(row => [...row]);
-    const newBoard = board.map(row => [...row]);
-
+    
+    // Clone the board for comparison
+    const originalBoard = JSON.parse(JSON.stringify(board));
+    
     function mergeLine(line) {
         let merged = line.filter(val => val !== 0);
         for (let i = 0; i < merged.length - 1; i++) {
@@ -600,20 +616,19 @@ function move(direction) {
                     document.getElementById('bestScore').textContent = bestScore;
                 }
                 merged.splice(i + 1, 1);
-                moved = true;
             }
         }
         while (merged.length < gridSize) merged.push(0);
         return merged;
     }
-
+    
     if (direction === 'left' || direction === 'right') {
         for (let i = 0; i < gridSize; i++) {
             let line = [...board[i]];
             if (direction === 'right') line.reverse();
             line = mergeLine(line);
             if (direction === 'right') line.reverse();
-            newBoard[i] = line;
+            board[i] = line;
         }
     } else {
         for (let j = 0; j < gridSize; j++) {
@@ -622,22 +637,25 @@ function move(direction) {
             line = mergeLine(line);
             if (direction === 'down') line.reverse();
             for (let i = 0; i < gridSize; i++) {
-                newBoard[i][j] = line[i];
+                board[i][j] = line[i];
             }
         }
     }
-
-    moved = JSON.stringify(previousBoard) !== JSON.stringify(newBoard);
-
+    
+    // Check if board changed
+    moved = JSON.stringify(originalBoard) !== JSON.stringify(board);
+    
     if (moved) {
         moves++;
         // Update moves display
         document.getElementById('moves').textContent = moves;
-        board = newBoard;
+        
+        // First update display to show sliding animation
         updateDisplay(true);
-
+        
+        // Then add a new tile after animation completes
         setTimeout(() => {
-            const newTilePos = addRandomTile();
+            addRandomTile();
             updateDisplay(true);
             
             if (isGameOver()) {
@@ -645,9 +663,11 @@ function move(direction) {
                     showGameOver();
                 }, 300);
             }
-        }, 100);
+        }, 150); // Wait for animation to complete
     }
-}        function isGameOver() {
+    
+    return moved;
+}       function isGameOver() {
             // Check for empty cells
             for (let i = 0; i < gridSize; i++) {
                 for (let j = 0; j < gridSize; j++) {
