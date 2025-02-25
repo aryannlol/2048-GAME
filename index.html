@@ -56,11 +56,10 @@
     align-items: center;
     font-weight: bold;
     font-size: clamp(16px, 5vw, 35px);
-    /* Remove default transition */
-    transition: none;
     z-index: 1;
     will-change: transform;
     font-family: Inter;
+    transition: transform 150ms ease-in-out;
 }
 
 /* Add sliding animation class */
@@ -68,22 +67,25 @@
     transition: transform 100ms ease-in-out;
 }
 
-        @keyframes appear {
-            0% { 
-                opacity: 0;
-                transform: scale(0); 
-            }
-            100% { 
-                opacity: 1;
-                transform: scale(1); 
-            }
-        }
+@keyframes appear {
+    0% { 
+        opacity: 0;
+        transform: scale(0); 
+    }
+    100% { 
+        opacity: 1;
+        transform: scale(1); 
+    }
+}
 
-        @keyframes pop {
-            0% { transform: scale(1); }
-            50% { transform: scale(1.2); }
-            100% { transform: scale(1); }
-        }
+@keyframes pop {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.2); }
+    100% { transform: scale(1); }
+}
+.tile-merged {
+    animation: pop 150ms ease-in-out;
+}
         .game-container {
             display: flex;
             flex-direction: column;
@@ -505,7 +507,7 @@
             }, { once: true });
         }
 
-function updateDisplay(animated = true) {
+        function updateDisplay(animated = true) {
     const grid = document.getElementById('grid');
     const gridRect = grid.getBoundingClientRect();
     const cellSize = (gridRect.width - 50) / 4;
@@ -667,7 +669,8 @@ function move(direction) {
     }
     
     return moved;
-}       function isGameOver() {
+}
+    function isGameOver() {
             // Check for empty cells
             for (let i = 0; i < gridSize; i++) {
                 for (let j = 0; j < gridSize; j++) {
